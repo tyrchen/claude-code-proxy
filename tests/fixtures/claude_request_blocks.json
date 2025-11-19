@@ -1,0 +1,20 @@
+{
+  "model": "claude-3-opus-20240229",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Analyze this code:"
+        },
+        {
+          "type": "text",
+          "text": "fn main() { println!(\"Hello\"); }"
+        }
+      ]
+    }
+  ],
+  "max_tokens": 200,
+  "stream": true
+}

@@ -1,0 +1,13 @@
+{
+  "model": "claude-3-5-sonnet-20241022",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is Rust?"
+    }
+  ],
+  "system": "You are a professional Rust engineer with deep expertise in systems programming.",
+  "max_tokens": 500,
+  "temperature": 0.7,
+  "stream": true
+}
