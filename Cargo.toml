@@ -17,14 +17,15 @@ keywords = []
 [dependencies]
 anyhow = "1.0.100"
 async-trait = "0.1"
-bytes = "1.6"
+bytes = "1.11"
+env_logger = "0.11"
 pingora = { version = "0.6.0", features = ["cache", "lb", "rustls"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 thiserror = "2.0.17"
 tokio = { version = "1.48.0", features = ["rt", "rt-multi-thread", "macros"] }
-toml = "0.8"
-uuid = { version = "1.11", features = ["v4", "serde"] }
+toml = "0.9"
+uuid = { version = "1.18", features = ["v4", "serde"] }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.7"

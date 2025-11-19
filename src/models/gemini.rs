@@ -34,14 +34,14 @@ pub struct GeminiSystemInstruction {
     pub parts: Vec<GeminiPart>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GeminiPart {
     Text { text: String },
     InlineData { inline_data: InlineData },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InlineData {
     pub mime_type: String,

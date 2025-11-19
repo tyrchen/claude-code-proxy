@@ -1,2 +1,5 @@
-// Placeholder for streaming module
-// Will be implemented in Phase 3
+pub mod parser;
+pub mod sse;
+
+pub use parser::StreamingJsonParser;
+pub use sse::SSEEventGenerator;
