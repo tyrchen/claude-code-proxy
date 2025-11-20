@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Claude Messages API Request
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -36,6 +37,10 @@ pub struct ClaudeRequest {
     /// Top-K sampling
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<u32>,
+
+    /// Tool definitions for function calling
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<ClaudeTool>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -54,17 +59,111 @@ pub enum ContentType {
     Blocks(Vec<ContentBlock>),
 }
 
+/// Content block with proper tagged enum for type safety
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ContentBlock {
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContentBlock {
+    Text {
+        text: String,
+    },
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        is_error: Option<bool>,
+    },
+}
+
+/// Claude tool definition
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ClaudeTool {
+    pub name: String,
+    pub description: String,
+    pub input_schema: JsonSchema,
+}
+
+/// JSON Schema definition (supports OpenAPI-compatible subset)
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct JsonSchema {
     #[serde(rename = "type")]
-    pub block_type: String, // "text", "image", "tool_use", "tool_result"
+    pub schema_type: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
+    pub description: Option<String>,
 
-    // Additional fields for images, tools, etc.
-    #[serde(flatten)]
-    pub extra: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub properties: Option<HashMap<String, Box<JsonSchema>>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<Vec<String>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "enum")]
+    pub enum_values: Option<Vec<serde_json::Value>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub items: Option<Box<JsonSchema>>,
+
+    // Additional fields we might need
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimum: Option<f64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maximum: Option<f64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
+
+    // Catch-all for additional schema fields from Claude
+    // Note: We don't serialize these to Gemini (they're not supported)
+    #[serde(flatten, skip_serializing)]
+    pub additional: HashMap<String, serde_json::Value>,
+}
+
+// Custom Serialize implementation to ensure only supported fields go to Gemini
+impl Serialize for JsonSchema {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(None)?;
+
+        map.serialize_entry("type", &self.schema_type)?;
+
+        if let Some(ref desc) = self.description {
+            map.serialize_entry("description", desc)?;
+        }
+        if let Some(ref props) = self.properties {
+            map.serialize_entry("properties", props)?;
+        }
+        if let Some(ref req) = self.required {
+            map.serialize_entry("required", req)?;
+        }
+        if let Some(ref enums) = self.enum_values {
+            map.serialize_entry("enum", enums)?;
+        }
+        if let Some(ref items) = self.items {
+            map.serialize_entry("items", items)?;
+        }
+        if let Some(min) = self.minimum {
+            map.serialize_entry("minimum", &min)?;
+        }
+        if let Some(max) = self.maximum {
+            map.serialize_entry("maximum", &max)?;
+        }
+        if let Some(ref pat) = self.pattern {
+            map.serialize_entry("pattern", pat)?;
+        }
+
+        map.end()
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -211,9 +310,84 @@ mod tests {
         match &req.messages[0].content {
             ContentType::Blocks(blocks) => {
                 assert_eq!(blocks.len(), 2);
-                assert_eq!(blocks[0].block_type, "text");
+                assert!(matches!(&blocks[0], ContentBlock::Text { .. }));
             }
             _ => panic!("Expected ContentType::Blocks"),
         }
+    }
+
+    #[test]
+    fn test_parse_tool_use_block() {
+        let json = r#"{
+            "type": "tool_use",
+            "id": "toolu_123",
+            "name": "get_weather",
+            "input": {"location": "San Francisco"}
+        }"#;
+
+        let block: ContentBlock = serde_json::from_str(json).unwrap();
+        match block {
+            ContentBlock::ToolUse { id, name, input } => {
+                assert_eq!(id, "toolu_123");
+                assert_eq!(name, "get_weather");
+                assert_eq!(input["location"], "San Francisco");
+            }
+            _ => panic!("Expected ToolUse"),
+        }
+    }
+
+    #[test]
+    fn test_parse_tool_result_block() {
+        let json = r#"{
+            "type": "tool_result",
+            "tool_use_id": "toolu_123",
+            "content": "Sunny, 72°F"
+        }"#;
+
+        let block: ContentBlock = serde_json::from_str(json).unwrap();
+        match block {
+            ContentBlock::ToolResult {
+                tool_use_id,
+                content,
+                ..
+            } => {
+                assert_eq!(tool_use_id, "toolu_123");
+                assert_eq!(content, "Sunny, 72°F");
+            }
+            _ => panic!("Expected ToolResult"),
+        }
+    }
+
+    #[test]
+    fn test_parse_request_with_tools() {
+        let json = r#"{
+            "model": "claude-3-5-sonnet",
+            "messages": [
+                {"role": "user", "content": "What's the weather?"}
+            ],
+            "tools": [
+                {
+                    "name": "get_weather",
+                    "description": "Get weather for a location",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "location": {
+                                "type": "string",
+                                "description": "City name"
+                            }
+                        },
+                        "required": ["location"]
+                    }
+                }
+            ]
+        }"#;
+
+        let req: ClaudeRequest = serde_json::from_str(json).unwrap();
+        assert!(req.tools.is_some());
+        let tools = req.tools.unwrap();
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0].name, "get_weather");
+        assert_eq!(tools[0].input_schema.schema_type, "object");
     }
 }

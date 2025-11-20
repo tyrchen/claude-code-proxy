@@ -16,7 +16,7 @@ fn test_parse_gemini_stream_fixture() {
 #[test]
 fn test_complete_streaming_pipeline() {
     let mut parser = StreamingJsonParser::new();
-    let mut generator = SSEEventGenerator::new("gemini-2.0-flash-exp".to_string());
+    let mut generator = SSEEventGenerator::new("gemini-3-pro-preview".to_string());
 
     // Simulate streaming chunks from Gemini
     let chunk1 = br#"[{"candidates":[{"content":{"parts":[{"text":"Hello"}],"role":"model"}}],"usageMetadata":{"promptTokenCount":10}}]"#;
@@ -141,7 +141,7 @@ fn test_error_event_format() {
 fn test_realistic_streaming_scenario() {
     // Simulate a realistic Gemini API response arriving in chunks
     let mut parser = StreamingJsonParser::new();
-    let mut generator = SSEEventGenerator::new("gemini-1.5-pro".to_string());
+    let mut generator = SSEEventGenerator::new("gemini-3-pro-preview".to_string());
 
     let fixture = fs::read_to_string("tests/fixtures/gemini_response_stream.json").unwrap();
 
@@ -185,7 +185,7 @@ fn test_parser_handles_malformed_gracefully() {
     let results = parser.feed(data).unwrap();
 
     // Should get the first valid object, skip invalid, get last valid
-    assert!(results.len() >= 1);
+    assert!(!results.is_empty());
 }
 
 #[test]
@@ -208,15 +208,15 @@ fn test_finish_reason_variations() {
             .unwrap();
 
         // Reset generator for each test
-        let mut gen = SSEEventGenerator::new("test".to_string());
-        gen.generate_events(
+        let mut event_gen = SSEEventGenerator::new("test".to_string());
+        event_gen.generate_events(
             serde_json::from_str(
                 r#"{"candidates":[{"content":{"parts":[{"text":"x"}],"role":"model"}}]}"#,
             )
             .unwrap(),
         ); // Send header
 
-        let events = gen.generate_events(chunk);
+        let events = event_gen.generate_events(chunk);
         let combined = events.join("");
 
         assert!(

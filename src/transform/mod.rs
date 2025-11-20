@@ -1,21 +1,15 @@
 pub mod request;
+pub mod tools;
 pub mod validation;
 
 pub use request::*;
+pub use tools::*;
 pub use validation::*;
 
 /// Maps Claude model identifiers to appropriate Gemini models
-pub fn map_model_name(claude_model: &str) -> &'static str {
-    // Fuzzy matching to handle version suffixes
-    if claude_model.contains("opus") {
-        "gemini-1.5-pro" // Opus -> Pro (highest capability)
-    } else if claude_model.contains("sonnet") {
-        "gemini-2.0-flash-exp" // Sonnet -> Flash (balanced)
-    } else if claude_model.contains("haiku") {
-        "gemini-2.0-flash-exp" // Haiku -> Flash (speed)
-    } else {
-        "gemini-2.0-flash-exp" // Default fallback
-    }
+pub fn map_model_name(_claude_model: &str) -> &'static str {
+    // Currently all Claude models map to Gemini 3 Pro Preview
+    "gemini-3-pro-preview"
 }
 
 #[cfg(test)]
@@ -26,20 +20,23 @@ mod tests {
     fn test_model_mapping() {
         assert_eq!(
             map_model_name("claude-3-5-sonnet-20241022"),
-            "gemini-2.0-flash-exp"
+            "gemini-3-pro-preview"
         );
-        assert_eq!(map_model_name("claude-3-opus-20240229"), "gemini-1.5-pro");
+        assert_eq!(
+            map_model_name("claude-3-opus-20240229"),
+            "gemini-3-pro-preview"
+        );
         assert_eq!(
             map_model_name("claude-3-haiku-20240307"),
-            "gemini-2.0-flash-exp"
+            "gemini-3-pro-preview"
         );
-        assert_eq!(map_model_name("unknown-model"), "gemini-2.0-flash-exp");
+        assert_eq!(map_model_name("unknown-model"), "gemini-3-pro-preview");
     }
 
     #[test]
     fn test_model_mapping_fuzzy() {
-        assert_eq!(map_model_name("claude-opus"), "gemini-1.5-pro");
-        assert_eq!(map_model_name("claude-sonnet"), "gemini-2.0-flash-exp");
-        assert_eq!(map_model_name("opus-v2"), "gemini-1.5-pro");
+        assert_eq!(map_model_name("claude-opus"), "gemini-3-pro-preview");
+        assert_eq!(map_model_name("claude-sonnet"), "gemini-3-pro-preview");
+        assert_eq!(map_model_name("opus-v2"), "gemini-3-pro-preview");
     }
 }

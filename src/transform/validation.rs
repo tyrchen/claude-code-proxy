@@ -20,53 +20,54 @@ pub fn validate_claude_request(req: &ClaudeRequest) -> Result<()> {
     // Validate role alternation (relaxed - just check no consecutive assistants)
     let mut prev_role: Option<&str> = None;
     for msg in &req.messages {
-        if let Some(prev) = prev_role {
-            if prev == "assistant" && msg.role == "assistant" {
-                return Err(ProxyError::InvalidClaudeRequest(
-                    "Cannot have consecutive assistant messages".into(),
-                ));
-            }
+        if let Some(prev) = prev_role
+            && prev == "assistant"
+            && msg.role == "assistant"
+        {
+            return Err(ProxyError::InvalidClaudeRequest(
+                "Cannot have consecutive assistant messages".into(),
+            ));
         }
         prev_role = Some(&msg.role);
     }
 
     // Check token limits
-    if let Some(max_tokens) = req.max_tokens {
-        if max_tokens == 0 || max_tokens > 1_000_000 {
-            return Err(ProxyError::InvalidClaudeRequest(format!(
-                "Invalid max_tokens: {}. Must be between 1 and 1,000,000",
-                max_tokens
-            )));
-        }
+    if let Some(max_tokens) = req.max_tokens
+        && (max_tokens == 0 || max_tokens > 1_000_000)
+    {
+        return Err(ProxyError::InvalidClaudeRequest(format!(
+            "Invalid max_tokens: {}. Must be between 1 and 1,000,000",
+            max_tokens
+        )));
     }
 
     // Validate temperature
-    if let Some(temp) = req.temperature {
-        if !(0.0..=2.0).contains(&temp) {
-            return Err(ProxyError::InvalidClaudeRequest(format!(
-                "Invalid temperature: {}. Must be between 0.0 and 2.0",
-                temp
-            )));
-        }
+    if let Some(temp) = req.temperature
+        && !(0.0..=2.0).contains(&temp)
+    {
+        return Err(ProxyError::InvalidClaudeRequest(format!(
+            "Invalid temperature: {}. Must be between 0.0 and 2.0",
+            temp
+        )));
     }
 
     // Validate top_p
-    if let Some(top_p) = req.top_p {
-        if !(0.0..=1.0).contains(&top_p) {
-            return Err(ProxyError::InvalidClaudeRequest(format!(
-                "Invalid top_p: {}. Must be between 0.0 and 1.0",
-                top_p
-            )));
-        }
+    if let Some(top_p) = req.top_p
+        && !(0.0..=1.0).contains(&top_p)
+    {
+        return Err(ProxyError::InvalidClaudeRequest(format!(
+            "Invalid top_p: {}. Must be between 0.0 and 1.0",
+            top_p
+        )));
     }
 
     // Validate top_k
-    if let Some(top_k) = req.top_k {
-        if top_k == 0 {
-            return Err(ProxyError::InvalidClaudeRequest(
-                "Invalid top_k: 0. Must be greater than 0".into(),
-            ));
-        }
+    if let Some(top_k) = req.top_k
+        && top_k == 0
+    {
+        return Err(ProxyError::InvalidClaudeRequest(
+            "Invalid top_k: 0. Must be greater than 0".into(),
+        ));
     }
 
     Ok(())
@@ -91,6 +92,7 @@ mod tests {
             stream: true,
             top_p: None,
             top_k: None,
+            tools: None,
         }
     }
 
@@ -107,10 +109,12 @@ mod tests {
 
         let result = validate_claude_request(&req);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("No messages provided"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("No messages provided")
+        );
     }
 
     #[test]
@@ -120,10 +124,12 @@ mod tests {
 
         let result = validate_claude_request(&req);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("First message must be from user"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("First message must be from user")
+        );
     }
 
     #[test]
@@ -140,10 +146,12 @@ mod tests {
 
         let result = validate_claude_request(&req);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("consecutive assistant"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("consecutive assistant")
+        );
     }
 
     #[test]

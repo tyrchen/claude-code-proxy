@@ -86,10 +86,10 @@ Successfully completed Phase 1 (Foundation) and Phase 2 (Request Pipeline) of th
 - `test_model_mapping_fuzzy`
 
 **Mapping Logic:**
-- `claude-*-opus-*` → `gemini-1.5-pro` (highest capability)
-- `claude-*-sonnet-*` → `gemini-2.0-flash-exp` (balanced)
-- `claude-*-haiku-*` → `gemini-2.0-flash-exp` (speed)
-- Default → `gemini-2.0-flash-exp`
+- `claude-*-opus-*` → `gemini-3-pro-preview` (highest capability)
+- `claude-*-sonnet-*` → `gemini-3-pro-preview` (balanced)
+- `claude-*-haiku-*` → `gemini-3-pro-preview` (speed)
+- Default → `gemini-3-pro-preview`
 
 ---
 

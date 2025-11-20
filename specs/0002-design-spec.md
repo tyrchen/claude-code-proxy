@@ -482,13 +482,13 @@ struct SafetyRating {
 fn map_model_name(claude_model: &str) -> &'static str {
     // Fuzzy matching to handle version suffixes
     if claude_model.contains("opus") {
-        "gemini-1.5-pro"  // Opus -> Pro (highest capability)
+        "gemini-3-pro-preview"  // Opus -> Pro (highest capability)
     } else if claude_model.contains("sonnet") {
-        "gemini-2.0-flash-exp"  // Sonnet -> Flash (balanced)
+        "gemini-3-pro-preview"  // Sonnet -> Flash (balanced)
     } else if claude_model.contains("haiku") {
-        "gemini-2.0-flash-exp"  // Haiku -> Flash (speed)
+        "gemini-3-pro-preview"  // Haiku -> Flash (speed)
     } else {
-        "gemini-2.0-flash-exp"  // Default fallback
+        "gemini-3-pro-preview"  // Default fallback
     }
 }
 ```
@@ -916,9 +916,9 @@ impl ProxyHttp for ClaudeToGeminiProxy {
     fn new_ctx(&self) -> Self::CTX {
         RequestContext {
             transformed_body: None,
-            target_model: "gemini-2.0-flash-exp".to_string(),
+            target_model: "gemini-3-pro-preview".to_string(),
             parser: StreamingJsonParser::new(),
-            event_generator: SSEEventGenerator::new("gemini-2.0-flash-exp".to_string()),
+            event_generator: SSEEventGenerator::new("gemini-3-pro-preview".to_string()),
             outgoing_events: BytesMut::new(),
         }
     }
@@ -1285,8 +1285,8 @@ mod tests {
 
     #[test]
     fn test_model_mapping() {
-        assert_eq!(map_model_name("claude-3-5-sonnet-20241022"), "gemini-2.0-flash-exp");
-        assert_eq!(map_model_name("claude-3-opus-20240229"), "gemini-1.5-pro");
+        assert_eq!(map_model_name("claude-3-5-sonnet-20241022"), "gemini-3-pro-preview");
+        assert_eq!(map_model_name("claude-3-opus-20240229"), "gemini-3-pro-preview");
     }
 
     #[test]
@@ -1624,13 +1624,13 @@ uuid = { version = "1.0", features = ["v4"] }
 
 ### 13.3 Performance Benchmarks (Target)
 
-| Metric | Target | Measurement Method |
-|--------|--------|-------------------|
-| Cold start latency | < 100ms | Time to first byte |
-| Streaming latency overhead | < 5ms | Proxy vs. direct API |
-| Memory per request | < 1MB | Peak allocation |
-| Throughput (4 cores) | > 1000 req/s | Concurrent load test |
-| JSON parse efficiency | > 500 MB/s | Benchmark suite |
+| Metric                     | Target       | Measurement Method   |
+|----------------------------|--------------|----------------------|
+| Cold start latency         | < 100ms      | Time to first byte   |
+| Streaming latency overhead | < 5ms        | Proxy vs. direct API |
+| Memory per request         | < 1MB        | Peak allocation      |
+| Throughput (4 cores)       | > 1000 req/s | Concurrent load test |
+| JSON parse efficiency      | > 500 MB/s   | Benchmark suite      |
 
 ---
 

@@ -2,10 +2,64 @@ use crate::error::Result;
 use crate::models::gemini::GeminiStreamChunk;
 use bytes::{Buf, BytesMut};
 
+/// Buffer for accumulating partial tool/function call input JSON
+/// Handles incremental streaming of function arguments
+#[derive(Debug, Clone)]
+pub struct ToolInputBuffer {
+    /// Accumulated partial JSON for tool input
+    pub partial_json: String,
+    /// Tool/function name
+    pub tool_name: String,
+    /// Tool use ID (Claude format)
+    pub tool_id: Option<String>,
+    /// Whether this buffer is complete
+    pub is_complete: bool,
+}
+
+impl ToolInputBuffer {
+    pub fn new(tool_name: String) -> Self {
+        Self {
+            partial_json: String::new(),
+            tool_name,
+            tool_id: None,
+            is_complete: false,
+        }
+    }
+
+    /// Append a chunk of JSON to the buffer
+    pub fn append(&mut self, chunk: &str) {
+        self.partial_json.push_str(chunk);
+    }
+
+    /// Try to parse the accumulated JSON, returning the parsed value if complete
+    pub fn try_parse(&self) -> Option<serde_json::Value> {
+        serde_json::from_str(&self.partial_json).ok()
+    }
+
+    /// Mark as complete and try final parse
+    pub fn finalize(&mut self) -> Result<serde_json::Value> {
+        self.is_complete = true;
+        serde_json::from_str(&self.partial_json).map_err(|e| {
+            crate::error::ProxyError::TransformationError(format!(
+                "Failed to parse complete tool input JSON for {}: {} - JSON was: {}",
+                self.tool_name, e, self.partial_json
+            ))
+        })
+    }
+
+    /// Get the current size of buffered data
+    pub fn size(&self) -> usize {
+        self.partial_json.len()
+    }
+}
+
 /// Stateful parser for Gemini's chunked JSON array stream
+/// Enhanced with tool input buffering for incremental function call parsing
 pub struct StreamingJsonParser {
     buffer: BytesMut,
     array_started: bool,
+    /// Optional tool input buffer for accumulating partial function args
+    tool_input_buffer: Option<ToolInputBuffer>,
 }
 
 impl StreamingJsonParser {
@@ -13,7 +67,50 @@ impl StreamingJsonParser {
         Self {
             buffer: BytesMut::with_capacity(8192),
             array_started: false,
+            tool_input_buffer: None,
         }
+    }
+
+    /// Start buffering tool input for a function call
+    pub fn start_tool_input(&mut self, tool_name: String, tool_id: Option<String>) {
+        let mut buffer = ToolInputBuffer::new(tool_name);
+        buffer.tool_id = tool_id;
+        self.tool_input_buffer = Some(buffer);
+        tracing::debug!("Started tool input buffering");
+    }
+
+    /// Append to current tool input buffer
+    pub fn append_tool_input(&mut self, chunk: &str) -> Option<serde_json::Value> {
+        if let Some(buffer) = &mut self.tool_input_buffer {
+            buffer.append(chunk);
+            tracing::debug!(size = buffer.size(), "Appended to tool input buffer");
+            // Try to parse, return if complete
+            buffer.try_parse()
+        } else {
+            None
+        }
+    }
+
+    /// Finalize and extract tool input buffer
+    pub fn finalize_tool_input(
+        &mut self,
+    ) -> Result<Option<(String, Option<String>, serde_json::Value)>> {
+        if let Some(mut buffer) = self.tool_input_buffer.take() {
+            let parsed = buffer.finalize()?;
+            tracing::debug!(
+                tool_name = %buffer.tool_name,
+                size = buffer.size(),
+                "Finalized tool input buffer"
+            );
+            Ok(Some((buffer.tool_name, buffer.tool_id, parsed)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Check if currently buffering tool input
+    pub fn is_buffering_tool_input(&self) -> bool {
+        self.tool_input_buffer.is_some()
     }
 
     /// Feed new data and extract complete JSON objects
@@ -118,6 +215,7 @@ impl StreamingJsonParser {
             self.buffer = BytesMut::with_capacity(8192);
         }
         self.array_started = false;
+        self.tool_input_buffer = None;
     }
 }
 

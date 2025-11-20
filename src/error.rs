@@ -14,6 +14,12 @@ pub enum ProxyError {
     #[error("Configuration error: {0}")]
     ConfigError(String),
 
+    #[error("Internal error: {0}")]
+    InternalError(String),
+
+    #[error("Upstream error: {0}")]
+    UpstreamError(String),
+
     #[error("JSON error: {0}")]
     JsonError(#[from] serde_json::Error),
 

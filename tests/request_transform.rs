@@ -14,7 +14,7 @@ fn test_transform_simple_request() {
     let gemini_req = transform_request(claude_req.clone()).unwrap();
 
     assert_eq!(gemini_req.contents.len(), 1);
-    assert_eq!(gemini_req.contents[0].role, "user");
+    assert_eq!(gemini_req.contents[0].role, Some("user".to_string()));
     assert!(gemini_req.system_instruction.is_none());
 
     // Verify generation config
@@ -23,7 +23,7 @@ fn test_transform_simple_request() {
 
     // Verify model mapping
     let target_model = map_model_name(&claude_req.model);
-    assert_eq!(target_model, "gemini-2.0-flash-exp");
+    assert_eq!(target_model, "gemini-3-pro-preview");
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn test_transform_request_with_blocks() {
 
     // Verify model mapping for opus
     let target_model = map_model_name(&claude_req.model);
-    assert_eq!(target_model, "gemini-1.5-pro"); // opus -> pro
+    assert_eq!(target_model, "gemini-3-pro-preview"); // opus -> pro
 }
 
 #[test]
@@ -98,6 +98,7 @@ fn test_validation_errors() {
         stream: true,
         top_p: None,
         top_k: None,
+        tools: None,
     };
 
     assert!(validate_claude_request(&req).is_err());

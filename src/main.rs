@@ -1,32 +1,85 @@
-use claude_code_proxy::{config::ProxyConfig, proxy::ClaudeToGeminiProxy};
-use pingora::prelude::*;
+use axum::{Router, routing::post};
+use clap::{Parser, Subcommand};
+use claude_code_proxy::{
+    client::{GeminiClient, KimiClient},
+    config::{ProviderConfig, ProxyConfig},
+    handler::{AppState, handle_messages},
+    provider::Provider,
+};
+use std::sync::Arc;
+use tracing::info;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
+#[derive(Parser)]
+#[command(name = "claude-code-proxy")]
+#[command(about = "Proxy Claude Code requests to various AI providers", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Use Gemini as the backend provider (with request transformation)
+    Gemini,
+    /// Use Kimi as the backend provider (pure forwarding, Claude-compatible)
+    Kimi,
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
+
+    let cli = Cli::parse();
+
+    // Determine provider type from subcommand
+    let provider_type = match cli.command {
+        Commands::Gemini => "gemini",
+        Commands::Kimi => "kimi",
+    };
 
     // Load configuration
-    let config = ProxyConfig::from_env()?;
+    let config = ProxyConfig::from_env(provider_type)?;
     config.validate()?;
 
-    eprintln!("Starting Claude-to-Gemini proxy...");
-    eprintln!("  Listen: {}", config.server.listen_addr);
-    eprintln!("  Workers: {}", config.server.workers);
-    eprintln!("  Gemini endpoint: {}", config.gemini.endpoint);
+    // Create appropriate provider client
+    let provider: Arc<dyn Provider> = match &config.provider {
+        ProviderConfig::Gemini(gemini_config) => {
+            info!("Starting Claude-to-Gemini proxy...");
+            info!("  Listen: {}", config.server.listen_addr);
+            info!("  Gemini endpoint: {}", gemini_config.endpoint);
+            Arc::new(GeminiClient::new(gemini_config.clone())?)
+        }
+        ProviderConfig::Kimi(kimi_config) => {
+            info!("Starting Claude-to-Kimi proxy...");
+            info!("  Listen: {}", config.server.listen_addr);
+            info!("  Kimi endpoint: {}", kimi_config.endpoint);
+            info!("  Kimi model: {}", kimi_config.model);
+            Arc::new(KimiClient::new(kimi_config.clone())?)
+        }
+    };
 
-    // Create Pingora server
-    let mut server = Server::new(None)?;
-    server.bootstrap();
+    // Clear any stale state from previous runs
+    claude_code_proxy::state::GLOBAL_STATE.clear();
+    claude_code_proxy::cache::TOOL_CACHE.clear();
+    claude_code_proxy::metrics::TOOL_METRICS.reset();
+    info!("  State cleared");
 
-    // Create proxy
-    let proxy = ClaudeToGeminiProxy::new(config.clone());
+    // Create app state
+    let state = Arc::new(AppState {
+        provider,
+        config: config.clone(),
+    });
 
-    // Create HTTP proxy service
-    let mut service = http_proxy_service(&server.configuration, proxy);
-    service.add_tcp(&config.server.listen_addr);
+    // Build router
+    let app = Router::new()
+        .route("/v1/messages", post(handle_messages))
+        .with_state(state);
 
-    eprintln!("Proxy ready!");
+    info!("Proxy ready!");
 
     // Start server
-    server.add_service(service);
-    server.run_forever();
+    let listener = tokio::net::TcpListener::bind(&config.server.listen_addr).await?;
+    axum::serve(listener, app).await?;
+
+    Ok(())
 }
