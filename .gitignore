@@ -1,3 +1,18 @@
-/target
-Cargo.lock
-.vscode
+  # Environment files
+  .env
+  .env.*
+  !.env.example
+
+  # Credentials
+  **/credentials*
+  **/secrets*
+  *.key
+  *.pem
+
+  # IDE
+  .vscode/
+  .idea/
+
+  # Build
+  /target
+  Cargo.lock

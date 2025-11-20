@@ -12,7 +12,7 @@ description = """
 """
 readme = "README.md"
 categories = ["development-tools"]
-keywords = []
+keywords = ["claude", "gemini", "proxy", "tool calling", "streaming"]
 
 [dependencies]
 anyhow = "1.0.100"
