@@ -521,18 +521,19 @@ fn test_e2e_error_handling() {
 /// Test all 11 Claude Code tools can be transformed
 #[test]
 fn test_all_claude_code_tools() {
+    // Use unique names to avoid cache pollution
     let tool_names = vec![
-        "TodoWrite",
-        "Task",
-        "Bash",
-        "Read",
-        "Edit",
-        "Write",
-        "Glob",
-        "Grep",
-        "AskUserQuestion",
-        "WebFetch",
-        "WebSearch",
+        "TodoWrite_test",
+        "Task_test",
+        "Bash_test",
+        "Read_test",
+        "Edit_test",
+        "Write_test",
+        "Glob_test",
+        "Grep_test",
+        "AskUserQuestion_test",
+        "WebFetch_test",
+        "WebSearch_test",
     ];
 
     for tool_name in tool_names {
